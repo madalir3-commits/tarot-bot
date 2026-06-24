@@ -5,7 +5,7 @@ const http = require('http');
 // ⚙️ НАЛАШТУВАННЯ
 // ==========================================
 // ВАЖЛИВО: На сервері Render токен і ID будуть братися зі змінних середовища (Environment).
-// Для локального тесту замініть текст у лапках на реальні дані.
+// Для локального тесту ОБОВ'ЯЗКОВО заміни ці дані на свої:
 const token = process.env.BOT_TOKEN || 'ТВІЙ_ТОКЕН_БОТА'; 
 const adminId = process.env.ADMIN_ID || 'ТВІЙ_ID_АДМІНА'; 
 const monoLink = 'https://send.monobank.ua/jar/ТВОЯ_БАНКА';
@@ -25,7 +25,7 @@ function getUser(msg) {
     if (!usersDB[chatId]) {
         usersDB[chatId] = {
             id: chatId,
-            username: msg.chat ? msg.chat.username : (msg.message ? msg.message.chat.username : 'Без_ніка'),
+            username: msg.chat ? msg.chat.username : (msg.message && msg.message.chat ? msg.message.chat.username : 'Без_ніка'),
             state: 'start',
             tariff: null,
             questionsLeft: 0,
