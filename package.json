@@ -1,11 +1,16 @@
 {
   "name": "tarot-bot",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "main": "bot.js",
   "scripts": {
-    "start": "node bot.js"
+    "start": "node bot.js",
+    "dev": "node -r dotenv/config bot.js"
   },
   "dependencies": {
-    "node-telegram-bot-api": "^0.66.0"
+    "node-telegram-bot-api": "^0.66.0",
+    "@supabase/supabase-js": "^2.45.4"
+  },
+  "devDependencies": {
+    "dotenv": "^16.4.5"
   }
 }
