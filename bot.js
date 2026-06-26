@@ -12,6 +12,10 @@ const { validateInitData } = require('./verifyTelegramWebApp');
 
 const token = process.env.BOT_TOKEN;
 const adminId = process.env.ADMIN_ID;
+// MONO_LINK — посилання на сторінку оплати. Незважаючи на назву змінної,
+// сюди можна вставити посилання БУДЬ-ЯКОГО банку чи платіжної системи
+// (Monobank, ПриватБанк, Wayforpay тощо) — бот просто вставляє цей рядок
+// у текст повідомлення клієнту, не перевіряючи, який саме банк це.
 const monoLink = process.env.MONO_LINK || 'https://send.monobank.ua/jar/ТВОЯ_БАНКА';
 const webAppUrl = process.env.WEBAPP_URL || 'https://delightful-choux-edcff2.netlify.app';
 const cardsWebAppUrl = process.env.CARDS_WEBAPP_URL || `${webAppUrl}/cards.html`;
@@ -204,7 +208,7 @@ async function handleBuyTariff(chatId, payload) {
         pendingTariff: tariffKey,
     });
 
-    const text = `Чудово. Тариф «${tariffKey}».\n\nОскільки це перший місяць запуску, ми приймаємо оплату прямим переказом.\n\n<b>Що треба зробити зараз:</b>\n1. Перейди за посиланням на Банку Monobank: ${monoLink}\n2. Сплати рівно <b>${tariffDef.price} грн</b>.\n3. Зроби скріншот успішної оплати (це важливо).\n4. Надішли цей скріншот прямо сюди, у цей діалог.\n\nЩойно мій помічник побачить скріншот, бот автоматично відкриє тобі доступ. Чекаю.`;
+    const text = `Чудово. Тариф «${tariffKey}».\n\nОскільки це перший місяць запуску, ми приймаємо оплату прямим переказом.\n\n<b>Що треба зробити зараз:</b>\n1. Перейди за посиланням для оплати: ${monoLink}\n2. Сплати рівно <b>${tariffDef.price} грн</b>.\n3. Зроби скріншот успішної оплати (це важливо).\n4. Надішли цей скріншот прямо сюди, у цей діалог.\n\nЩойно мій помічник побачить скріншот, бот автоматично відкриє тобі доступ. Чекаю.`;
 
     await bot.sendMessage(chatId, text, {
         parse_mode: 'HTML',
