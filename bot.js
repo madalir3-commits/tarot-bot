@@ -1,7 +1,6 @@
 const TelegramBot = require('node-telegram-bot-api');
 const http = require('http');
 const db = require('./db');
-const { validateInitData } = require('./verifyTelegramWebApp');
 
 // ==========================================
 // ⚙️ НАЛАШТУВАННЯ
@@ -149,50 +148,27 @@ async function handleWebAppData(chatId, rawData) {
 }
 
 /**
- * Спільна верифікація initData для будь-якої дії з Mini App.
- * Повертає verification.data при успіху, або null (і сама надсилає
- * повідомлення про помилку клієнту) при невдачі.
+ * ПРИМІТКА ПРО БЕЗПЕКУ:
+ * Ця Mini App відкривається через звичайну keyboard-кнопку (`reply_markup.keyboard`
+ * з `web_app`), а не через inline-кнопку чи menu button. За офіційною документацією
+ * Telegram, у цьому режимі `Telegram.WebApp.initData` ЗАВЖДИ порожній — це не помилка
+ * конкретного клієнта чи пристрою, а свідома архітектурна особливість Bot API
+ * (https://core.telegram.org/bots/webapps: "It is empty if the Mini App was launched
+ * from a keyboard button or from inline mode"). initData і sendData — взаємовиключні
+ * механізми: keyboard-кнопки дають sendData, але не дають initData; inline/menu-button
+ * дають initData, але не дають sendData.
+ *
+ * Тому тут НЕ перевіряється підпис initData — його просто не існує в цьому режимі.
+ * Натомість безпека забезпечується інакше:
+ * - chatId, з яким прийшло повідомлення, гарантовано достовірний — це сам Telegram
+ *   передає id чату, з якого реально написав конкретний користувач; підробити чужий
+ *   chatId через sendData неможливо.
+ * - Ціна й назва тарифу беруться ВИКЛЮЧНО із серверного словника TARIFFS, а не з
+ *   даних, що прийшли від клієнта — клієнт може вказати лише ключ (назву) тарифу,
+ *   які сервер або визнає, або відхилить.
  */
-async function verifyWebAppRequest(chatId, payload) {
-    if (!payload.initData) {
-        console.error(`⚠️ web_app_data без initData від chatId=${chatId} — відхилено.`);
-        await bot.sendMessage(
-            chatId,
-            'Виникла технічна помилка перевірки. Спробуй, будь ласка, ще раз або напиши /start.'
-        ).catch(() => {});
-        return null;
-    }
-
-    const verification = validateInitData(payload.initData, token);
-    if (!verification.valid) {
-        console.error(`⚠️ Невалідний initData від chatId=${chatId}: ${verification.reason}`);
-        await bot.sendMessage(
-            chatId,
-            'Не вдалося підтвердити запит. Спробуй відкрити Провідник ще раз.'
-        ).catch(() => {});
-        return null;
-    }
-
-    const verifiedUserId = verification.data.user && verification.data.user.id;
-    if (verifiedUserId && Number(verifiedUserId) !== Number(chatId)) {
-        console.error(`⚠️ Розбіжність user.id у initData (${verifiedUserId}) та chatId (${chatId}).`);
-        return null;
-    }
-
-    return verification.data;
-}
 
 async function handleBuyTariff(chatId, payload) {
-    // --- Верифікація підпису Telegram WebApp (захист від підробки тарифу/ціни) ---
-    // Mini App повинна надсилати initData разом з payload:
-    //   Telegram.WebApp.sendData(JSON.stringify({
-    //     action: 'buy_tariff',
-    //     tariff: 'Провідник',
-    //     initData: Telegram.WebApp.initData
-    //   }))
-    const verified = await verifyWebAppRequest(chatId, payload);
-    if (!verified) return;
-
     // --- Ціна й назва тарифу беруться ТІЛЬКИ з сервера, ніколи з клієнта ---
     const tariffKey = payload.tariff;
     const tariffDef = TARIFFS[tariffKey];
@@ -219,12 +195,9 @@ async function handleBuyTariff(chatId, payload) {
 
 /**
  * Клієнт обрав одну з 3 карт дня в Mini App.
- * payload: { action: 'pick_daily_card', cardIndex: 0|1|2, initData }
+ * payload: { action: 'pick_daily_card', cardIndex: 0|1|2 }
  */
 async function handlePickDailyCard(chatId, payload) {
-    const verified = await verifyWebAppRequest(chatId, payload);
-    if (!verified) return;
-
     const cardIndex = Number(payload.cardIndex);
     if (![0, 1, 2].includes(cardIndex)) {
         console.error(`⚠️ Невірний cardIndex "${payload.cardIndex}" від chatId=${chatId}.`);
