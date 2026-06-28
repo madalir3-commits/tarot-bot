@@ -669,6 +669,15 @@ http
     .createServer((req, res) => {
         const url = new URL(req.url, `http://${req.headers.host}`);
 
+        // Легкий ендпоінт спеціально для keep-alive пінгів (cron-job.org тощо).
+        // Мінімальна відповідь без заголовків/тексту, щоб точно не впиратись
+        // у будь-які ліміти розміру відповіді на стороні пінгувального сервісу.
+        if (url.pathname === '/ping') {
+            res.writeHead(200, { 'Content-Type': 'text/plain' });
+            res.end('ok');
+            return;
+        }
+
         if (url.pathname === '/cron/remind' || url.pathname === '/cron/broadcast') {
             const key = url.searchParams.get('key');
             if (key !== cronSecret) {
