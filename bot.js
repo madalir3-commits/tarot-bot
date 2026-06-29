@@ -32,7 +32,13 @@ if (missing.length > 0) {
 
 const ADMIN_ID_NUM = Number(adminId);
 
-const bot = new TelegramBot(token, { polling: true });
+const bot = new TelegramBot(token, {
+    polling: {
+        interval: 300,
+        autoStart: true,
+        params: { timeout: 10 },
+    },
+});
 
 // Тарифи описуємо на сервері — джерело правди для ціни/назви,
 // а не довільні дані, що приходять з клієнта.
@@ -562,10 +568,38 @@ async function handleAdminCardUpload(adminChatId, adminUser, msg) {
 }
 
 // ==========================================
-// 5. ГЛОБАЛЬНА ОБРОБКА ПОМИЛОК POLLING
+// 5. ГЛОБАЛЬНА ОБРОБКА ПОМИЛОК POLLING (з автоматичним перезапуском)
 // ==========================================
+// Бібліотека node-telegram-bot-api НЕ перезапускає polling сама після
+// мережевих помилок (ECONNRESET, ETIMEDOUT тощо) — після такої помилки
+// бот залишається "живим" (процес не падає), але повністю припиняє
+// отримувати нові повідомлення від Telegram, доки хтось не перезапустить
+// polling вручну. Тому робимо це самі, з невеликою затримкою і захистом
+// від накладання кількох одночасних спроб перезапуску.
+let isReconnecting = false;
+
 bot.on('polling_error', (err) => {
     console.error('Polling error:', err.message);
+
+    if (isReconnecting) return; // вже в процесі перезапуску — не накладаємо спроби одна на одну
+    isReconnecting = true;
+
+    bot
+        .stopPolling()
+        .catch((e) => console.error('Помилка stopPolling:', e.message))
+        .finally(() => {
+            setTimeout(() => {
+                bot
+                    .startPolling()
+                    .then(() => {
+                        console.log('✅ Polling успішно перезапущено після помилки.');
+                    })
+                    .catch((e) => console.error('Помилка startPolling:', e.message))
+                    .finally(() => {
+                        isReconnecting = false;
+                    });
+            }, 3000); // невелика пауза перед повторною спробою з'єднання
+        });
 });
 
 // ==========================================
