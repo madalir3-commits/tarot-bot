@@ -169,6 +169,18 @@ async function handleWebAppData(chatId, rawData) {
  */
 
 async function handleBuyTariff(chatId, payload) {
+    // Якщо клієнт уже активний (підписка підтверджена адміном) — не пропонуємо
+    // оплату повторно. Це могло траплятись, якщо клієнт відкривав Mini App
+    // ще раз після того, як адмін уже підтвердив оплату.
+    const existingUser = await db.getUser(chatId);
+    if (existingUser.state === 'active' && existingUser.tariff) {
+        await bot.sendMessage(
+            chatId,
+            `У тебе вже активна підписка «${existingUser.tariff}». Якщо хочеш змінити тариф — напиши, будь ласка, в підтримку.`
+        );
+        return;
+    }
+
     // --- Ціна й назва тарифу беруться ТІЛЬКИ з сервера, ніколи з клієнта ---
     const tariffKey = payload.tariff;
     const tariffDef = TARIFFS[tariffKey];
