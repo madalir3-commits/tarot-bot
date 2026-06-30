@@ -106,8 +106,32 @@ async function getUser(chatId, defaults = {}) {
     });
 
     if (insertError) {
-        // Можливий race condition при паралельних запитах — спробуємо ще раз прочитати
+        // Race condition: рядок для цього id вже існує в БД (наприклад, інший
+        // паралельний виклик getUser щойно його створив, або Telegram надіслав
+        // те саме повідомлення двічі через нестабільний polling). Перш це
+        // мовчки кешувало порожній newUser і ЗАТИРАЛО реальні дані з БД
+        // (включно з активною підпискою!) при наступному saveUser — критичний
+        // баг. Тепер натомість дійсно перечитуємо з БД, як і обіцяв коментар.
         console.error('DB error (getUser insert):', insertError.message);
+
+        const { data: retryData, error: retryError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', id)
+            .maybeSingle();
+
+        if (!retryError && retryData) {
+            const user = normalizeUser(retryData);
+            cache.set(id, user);
+            return user;
+        }
+
+        // Якщо навіть повторне читання не дало результату — це вже не race
+        // condition, а реальна проблема з БД. Прокидаємо помилку нагору, щоб
+        // викликаючий код не продовжував працювати з фантомними порожніми
+        // даними користувача.
+        console.error('DB error (getUser retry select):', retryError && retryError.message);
+        throw insertError;
     }
 
     cache.set(id, newUser);
